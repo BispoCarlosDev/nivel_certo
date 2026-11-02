@@ -13,11 +13,17 @@ class LoginScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
+
+              // Adicionando um SizedBox para distanciar o logo do topo da tela
               const SizedBox(height: 20),
+
+              // Adicionando o Logo do aplicativo
               Image.asset(
                 'assets/images/Logo_App_NC.png',
                 height: 120,
               ),
+
+              // Adicionando o nome do app abaixo do Logo
               const Text(
                 'Nível Certo',
                 style: TextStyle(
@@ -27,7 +33,11 @@ class LoginScreen extends StatelessWidget {
                   color: Color(0xFF0D47A1),
                 ),
               ),
+
+              // SizedBox para afastar o nome do campo de email ou telefone
               const SizedBox(height: 40),
+
+              // Adicionando o campo para preencher o email ou telefone
               TextField(
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
@@ -38,8 +48,11 @@ class LoginScreen extends StatelessWidget {
                   prefixIcon: const Icon(Icons.person_outline),
                 ),
               ),
+
+              // SizedBox para agastar o campo de email ou telefone do campo de senha
               const SizedBox(height: 16),
 
+              // Adicionando o campo de senha
               TextField(
                 obscureText: true,
                 decoration: InputDecoration(
@@ -51,7 +64,11 @@ class LoginScreen extends StatelessWidget {
                   suffixIcon: const Icon(Icons.visibility_off),
                 ),
               ),
+
+              // SizedBox para distanciar o campo de senha do textbutton de esquecer a senha
               const SizedBox(height: 8),
+
+              // Adicionando um TextButton para a opção "Esqueci minha senha"
               Align(
                 alignment: Alignment.center,
                 child: TextButton(
@@ -67,7 +84,11 @@ class LoginScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
+              // SizedBox para afastar o textbutton de esqueci a senha do botão de entrar
               const SizedBox(height: 24),
+
+              // Adicionando o botão "Entrar"
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -92,8 +113,11 @@ class LoginScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
 
+              // SizedBox para afastar o botão Entrar do textbutton Criar Conta
+              const SizedBox(height: 16),
+              
+              // Adicionando o TextButton Criar Conta
               TextButton(
                 onPressed: () {
 
