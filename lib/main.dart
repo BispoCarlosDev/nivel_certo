@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nivel_certo/screens/tela_cadastrarusuario.dart';
 import 'package:nivel_certo/screens/tela_login.dart';
 void main() {
   runApp(const MyApp());
@@ -18,7 +19,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // Selecionand a tela de Login para iniciar o app
-      home: const LoginScreen(),
+      home: const CadastroUsuarioScreen(),
     );
   }
 }
