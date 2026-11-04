@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nivel_certo/screens/tela_cadastrarusuario.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -116,11 +117,14 @@ class LoginScreen extends StatelessWidget {
 
               // SizedBox para afastar o botão Entrar do textbutton Criar Conta
               const SizedBox(height: 16),
-              
+
               // Adicionando o TextButton Criar Conta
               TextButton(
                 onPressed: () {
-
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CadastroUsuarioScreen()),
+                  );
                 },
                 child: const Text(
                   'Criar Conta',
