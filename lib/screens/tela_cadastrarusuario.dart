@@ -116,14 +116,14 @@ class CadastroUsuarioScreen extends StatelessWidget {
                   child: const Text(
                     'Cadastrar-se',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 4),
               // Inserindo o texto clicável para Fazer login
               TextButton(
                 onPressed: () {
@@ -132,6 +132,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
                 child: const Text(
                   'Já tem conta? Fazer Login',
                   style: TextStyle(
+                    fontSize: 16,
                     color: Color(0xFF0D47A1),
                     fontWeight: FontWeight.w600,
                   ),

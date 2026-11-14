@@ -79,6 +79,7 @@ class LoginScreen extends StatelessWidget {
                   child: const Text(
                     'Esqueci Minha Senha',
                     style: TextStyle(
+                      fontSize: 16,
                       color: Color(0xFF0F47A1),
                       fontWeight: FontWeight.w600,
                     ),
@@ -116,7 +117,7 @@ class LoginScreen extends StatelessWidget {
               ),
 
               // SizedBox para afastar o botão Entrar do textbutton Criar Conta
-              const SizedBox(height: 16),
+              const SizedBox(height: 4),
 
               // Adicionando o TextButton Criar Conta
               TextButton(
@@ -129,6 +130,7 @@ class LoginScreen extends StatelessWidget {
                 child: const Text(
                   'Criar Conta',
                   style: TextStyle(
+                    fontSize: 16,
                     color: Color(0xFF0D47A1),
                     fontWeight: FontWeight.w600,
                   ),

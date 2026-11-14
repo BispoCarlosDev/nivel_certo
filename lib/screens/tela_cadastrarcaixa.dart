@@ -13,6 +13,7 @@ class CadastroCaixaScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Adicionando Logo e Nome do App
               Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -34,7 +35,7 @@ class CadastroCaixaScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
-              // Título da Tela
+              // Inserindo o título da Tela Cadastrar Caixas Dagua
               const Text(
                 'Cadastrar Caixa D\'Água',
                 style: TextStyle(
@@ -45,7 +46,7 @@ class CadastroCaixaScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // (Continuando dentro da Column:)
+              // Inserindo um container e um botão para sincronizar dispositivos
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -68,7 +69,7 @@ class CadastroCaixaScreen extends StatelessWidget {
                     ),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D47A1), // Azul escuro
+                        backgroundColor: const Color(0xFF0D47A1),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -94,9 +95,7 @@ class CadastroCaixaScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // (Continuando dentro da Column:)
-
-              // Nome da Caixa
+              // Inserindo o campo Nome da Caixa
               TextField(
                 decoration: InputDecoration(
                   labelText: 'Nome da Caixa',
@@ -107,7 +106,7 @@ class CadastroCaixaScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Marca Caixa D'Água (Simulando o select com seta)
+              // Inserindo o campo marca da Caixa
               TextField(
                 readOnly: true,
                 decoration: InputDecoration(
@@ -120,7 +119,7 @@ class CadastroCaixaScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Tamanho (Litros)
+              // Inserindo o campo de tamanho da caixa
               TextField(
                 readOnly: true,
                 decoration: InputDecoration(
@@ -133,7 +132,7 @@ class CadastroCaixaScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Modelo
+              // Inserindo o modelo da caixa
               TextField(
                 readOnly: true,
                 decoration: InputDecoration(
@@ -146,9 +145,7 @@ class CadastroCaixaScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // (Finalizando dentro da Column:)
-
-              // Botão Confirmar
+              // Inserindo o botão de confirmar
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -172,9 +169,9 @@ class CadastroCaixaScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 4),
 
-              // Link Cancelar
+              // Inserindo o textbutto de cancelar
               Center(
                 child: TextButton(
                   onPressed: () {
@@ -183,6 +180,7 @@ class CadastroCaixaScreen extends StatelessWidget {
                   child: const Text(
                     'Cancelar',
                     style: TextStyle(
+                      fontSize: 16,
                       color: Color(0xFF0D47A1),
                       fontWeight: FontWeight.w600,
                     ),
