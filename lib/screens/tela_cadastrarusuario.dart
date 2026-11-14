@@ -13,6 +13,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Adicionando o logo e o nome do app
               Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -33,7 +34,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 32),
-
+              // Inserindo o título da tela "Cadastrar Usuário"
               const Text(
                 'Cadastrar Usuário',
                 style: TextStyle(
@@ -43,6 +44,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
+              // Inserindo o campo para o nome
               TextField(
                 decoration: InputDecoration(
                   labelText: 'Nome Completo',
@@ -50,6 +52,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              // Inserindo o campo para selecionar a data de nascimento
               TextField(
                 decoration: InputDecoration(
                   labelText: 'Data de Nascimento',
@@ -58,6 +61,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              // Inserindo o campo para selecionar o gênero
               TextField(
                 readOnly: true,
                 decoration: InputDecoration(
@@ -67,6 +71,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              // Inserindo o campo para inserir o e-mail ou celular
               TextField(
                 decoration: InputDecoration(
                   labelText: 'E-mail ou Celular',
@@ -74,6 +79,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              // Inserindo o campo para a senha
               TextField(
                 obscureText: true,
                 decoration: InputDecoration(
@@ -83,6 +89,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              //Inserindo o campo Confirmar Senha
               TextField(
                 obscureText: true,
                 decoration: InputDecoration(
@@ -92,6 +99,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
+              // Inserindo o botão Cadastrar-se
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -116,6 +124,7 @@ class CadastroUsuarioScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              // Inserindo o texto clicável para Fazer login
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);
