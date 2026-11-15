@@ -59,7 +59,6 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Image.asset('assets/images/Logo_App_NC.png', height: 70),
-                  const SizedBox(width: 12),
                   const Text(
                     'Nível Certo',
                     style: TextStyle(

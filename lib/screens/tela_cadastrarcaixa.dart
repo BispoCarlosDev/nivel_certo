@@ -22,7 +22,6 @@ class CadastroCaixaScreen extends StatelessWidget {
                     'assets/images/Logo_App_NC.png',
                     height: 70,
                   ),
-                  const SizedBox(width: 12),
                   const Text(
                     'Nível Certo',
                     style: TextStyle(
