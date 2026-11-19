@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nivel_certo/screens/tela_cadastrarcaixa.dart';
 import 'package:nivel_certo/screens/tela_cadastrarusuario.dart';
+import 'package:nivel_certo/screens/tela_historicoconsumo.dart';
 import 'package:nivel_certo/screens/tela_login.dart';
 import 'package:nivel_certo/screens/tela_minhascaixas.dart';
 import 'package:nivel_certo/screens/tela_niveldeagua.dart';
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // Selecionand a tela de Login para iniciar o app
-      home: const NivelAguaScreen(),
+      home: const HistoricoConsumoScreen(),
     );
   }
 }
