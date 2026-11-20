@@ -10,9 +10,6 @@ class MinhasCaixasScreen extends StatefulWidget {
 }
 
 class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
-  // Variável para alternar entre o estado vazio (false) e com caixas cadastradas (true) para teste visual
-  bool _temCaixas = true;
-
   // Exemplo de lista de dados para preencher os cards das caixas D'Água
   final _caixas = [
     {
@@ -86,7 +83,7 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
 
               // Seleção de Opções Com Caixas ou sem Caixas
               Expanded(
-                child: _temCaixas
+                child: _caixas.isNotEmpty
                     ? _construirListaCaixas()
                     : _construirEstadoVazio(),
               ),
@@ -113,6 +110,53 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
         child: const Icon(Icons.add, color: Colors.white, size: 30),
       ),
     );
+  }
+
+  // Abre a tela de cadastro com os dados da caixa para edição
+  Future<void> _editarCaixa(Map<String, String> caixa) async {
+    final atualizada = await Navigator.push<Map<String, String>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CadastroCaixaScreen(caixa: caixa),
+      ),
+    );
+    if (atualizada != null) {
+      setState(() {
+        final index = _caixas.indexOf(caixa);
+        if (index != -1) _caixas[index] = atualizada;
+      });
+    }
+  }
+
+  // Pede confirmação antes de excluir a caixa
+  Future<void> _confirmarExclusao(Map<String, String> caixa) async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir caixa'),
+        content: Text(
+          'Deseja realmente excluir a caixa "${caixa['nome']}"? '
+          'Essa ação não poderá ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmou == true) {
+      setState(() => _caixas.remove(caixa));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Caixa excluída.')),
+      );
+    }
   }
 
   // Widget para o estado quando NÃO HÁ caixas cadastradas
@@ -230,11 +274,19 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
                         ],
                       ),
                     ),
-                    IconButton(
+                    PopupMenuButton<String>(
                       icon: const Icon(Icons.more_vert, color: Colors.white),
-                      onPressed: () {
-                        // Ação ao clicar nos três pontos
+                      onSelected: (opcao) {
+                        if (opcao == 'editar') {
+                          _editarCaixa(caixa);
+                        } else {
+                          _confirmarExclusao(caixa);
+                        }
                       },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(value: 'editar', child: Text('Editar')),
+                        PopupMenuItem(value: 'excluir', child: Text('Excluir')),
+                      ],
                     ),
                   ],
                 ),

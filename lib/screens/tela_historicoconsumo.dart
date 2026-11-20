@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 
 class HistoricoConsumoScreen extends StatefulWidget {
@@ -15,12 +16,7 @@ class HistoricoConsumoScreen extends StatefulWidget {
 }
 
 class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
-  // Estado da Semana Selecionada (Ex: Semana 44 por padrão)
-  int _semanaSelecionada = 44;
-  final List<int> _semanasDisponiveis = [43, 44, 45, 46, 47];
-
-  // Estado do Dia Selecionado (0 = Domingo, 1 = Segunda, 2 = Terça, etc.)
-  int _diaSelecionadoIndex = 2; // Terça-feira selecionada por padrão
+  static const int _quantidadeSemanas = 5;
 
   final List<String> _diasLetras = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
   final List<String> _diasNomes = [
@@ -32,15 +28,136 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
     'Sexta-Feira',
     'Sábado',
   ];
+  final List<String> _meses = [
+    'janeiro',
+    'fevereiro',
+    'março',
+    'abril',
+    'maio',
+    'junho',
+    'julho',
+    'agosto',
+    'setembro',
+    'outubro',
+    'novembro',
+    'dezembro',
+  ];
 
-  // Simulação de dados de consumo em litros para a semana selecionada (7 dias)
-  final List<double> _consumoSemanal = [520, 480, 347, 430, 390, 430, 520];
+  late final DateTime _hoje;
+  late final DateTime _inicioSemanaAtual; // Domingo da semana de hoje
+  late DateTime _ultimaSemanaExibida; // Domingo da semana mais à direita do seletor
+  late DateTime _inicioSemanaSelecionada; // Domingo da semana selecionada
+  late int _diaSelecionadoIndex; // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+
+  @override
+  void initState() {
+    super.initState();
+    final agora = DateTime.now();
+    _hoje = DateTime(agora.year, agora.month, agora.day);
+    _inicioSemanaAtual = _domingoDa(_hoje);
+    _ultimaSemanaExibida = _inicioSemanaAtual;
+    _inicioSemanaSelecionada = _inicioSemanaAtual;
+    _diaSelecionadoIndex = _hoje.weekday % 7;
+  }
+
+  DateTime _domingoDa(DateTime data) =>
+      DateTime(data.year, data.month, data.day - (data.weekday % 7));
+
+  DateTime _somarDias(DateTime data, int dias) =>
+      DateTime(data.year, data.month, data.day + dias);
+
+  // A semana 1 do ano é a que contém o dia 1º de janeiro (semanas de domingo a sábado)
+  int _numeroDaSemana(DateTime inicio) {
+    final fim = _somarDias(inicio, 6);
+    final primeiroDomingo = _domingoDa(DateTime(fim.year, 1, 1));
+    final dias = DateTime.utc(inicio.year, inicio.month, inicio.day)
+        .difference(
+          DateTime.utc(
+            primeiroDomingo.year,
+            primeiroDomingo.month,
+            primeiroDomingo.day,
+          ),
+        )
+        .inDays;
+    return dias ~/ 7 + 1;
+  }
+
+  String _maiuscula(String texto) => texto[0].toUpperCase() + texto.substring(1);
+
+  String _intervaloDaSemana(DateTime inicio) {
+    final fim = _somarDias(inicio, 6);
+    return '${inicio.day} de ${_meses[inicio.month - 1]} - '
+        '${fim.day} de ${_meses[fim.month - 1]} '
+        '(Semana ${_numeroDaSemana(inicio)})';
+  }
+
+  // Consumo em litros dos 7 dias da semana (domingo a sábado).
+  // Dias que ainda não aconteceram ficam sem valor (null).
+  List<double?> _consumoDaSemana(DateTime inicio) {
+    final semente =
+        DateTime.utc(inicio.year, inicio.month, inicio.day).millisecondsSinceEpoch ~/
+            86400000;
+    final aleatorio = Random(semente);
+    return List.generate(7, (i) {
+      final valor = (280 + aleatorio.nextInt(300)).toDouble();
+      return _somarDias(inicio, i).isAfter(_hoje) ? null : valor;
+    });
+  }
+
+  void _selecionarSemana(DateTime inicio) {
+    setState(() {
+      _inicioSemanaSelecionada = inicio;
+      final data = _somarDias(inicio, _diaSelecionadoIndex);
+      if (data.isAfter(_hoje)) _diaSelecionadoIndex = _hoje.weekday % 7;
+    });
+  }
+
+  // Abre o calendário para buscar qualquer data; seleciona a semana e o dia escolhidos
+  Future<void> _abrirCalendario() async {
+    final data = await showDatePicker(
+      context: context,
+      initialDate: _somarDias(_inicioSemanaSelecionada, _diaSelecionadoIndex),
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: _hoje,
+      helpText: 'Selecione uma data',
+    );
+    if (data == null || !mounted) return;
+
+    setState(() {
+      final inicio = _domingoDa(data);
+      _inicioSemanaSelecionada = inicio;
+      _diaSelecionadoIndex = data.weekday % 7;
+
+      // Se a semana escolhida é mais antiga que as exibidas, o seletor se desloca até ela
+      final primeiraExibida =
+          _somarDias(_ultimaSemanaExibida, -7 * (_quantidadeSemanas - 1));
+      if (inicio.isBefore(primeiraExibida)) {
+        final ultima = _somarDias(inicio, 7 * (_quantidadeSemanas - 1));
+        _ultimaSemanaExibida =
+            ultima.isAfter(_inicioSemanaAtual) ? _inicioSemanaAtual : ultima;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final List<double?> consumo = _consumoDaSemana(_inicioSemanaSelecionada);
+    final List<double> diasComDados = consumo.whereType<double>().toList();
+
     // Cálculo da média de consumo diário da semana
-    final double mediaConsumo =
-        _consumoSemanal.reduce((a, b) => a + b) / _consumoSemanal.length;
+    final double mediaConsumo = diasComDados.isEmpty
+        ? 0
+        : diasComDados.reduce((a, b) => a + b) / diasComDados.length;
+
+    final DateTime dataSelecionada =
+        _somarDias(_inicioSemanaSelecionada, _diaSelecionadoIndex);
+    final List<DateTime> semanas = List.generate(
+      _quantidadeSemanas,
+      (i) => _somarDias(
+        _ultimaSemanaExibida,
+        -7 * (_quantidadeSemanas - 1 - i),
+      ),
+    );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -121,15 +238,11 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
               // Seletor Horizontal de Semanas (S43, S44...)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: _semanasDisponiveis.map((semana) {
-                  final isSelected = semana == _semanaSelecionada;
+                children: semanas.map((inicioSemana) {
+                  final isSelected = inicioSemana == _inicioSemanaSelecionada;
                   return InkWell(
                     borderRadius: BorderRadius.circular(20),
-                    onTap: () {
-                      setState(() {
-                        _semanaSelecionada = semana;
-                      });
-                    },
+                    onTap: () => _selecionarSemana(inicioSemana),
                     child: Container(
                       width: 54,
                       height: 34,
@@ -145,7 +258,7 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                         ),
                       ),
                       child: Text(
-                        'S$semana',
+                        'S${_numeroDaSemana(inicioSemana)}',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -161,15 +274,29 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
               const SizedBox(height: 8),
 
               // Texto com intervalo da Semana Selecionada
-              Center(
-                child: Text(
-                  '25 de outubro - 31 de outubro (Semana $_semanaSelecionada)',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _intervaloDaSemana(_inicioSemanaSelecionada),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
                   ),
-                ),
+                  IconButton(
+                    tooltip: 'Buscar no calendário',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(
+                      Icons.calendar_month,
+                      color: Color(0xFF0D47A1),
+                    ),
+                    onPressed: _abrirCalendario,
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
 
@@ -231,40 +358,59 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                               padding: const EdgeInsets.only(
                                 right: 45.0,
                               ), // Garante o recuo exato para a legenda lateral
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceAround,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: List.generate(7, (index) {
-                                  final double valor = _consumoSemanal[index];
-                                  final double alturaProporcional =
-                                      (valor / 600) * 110;
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceAround,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: List.generate(7, (index) {
+                                        final double? valor = consumo[index];
+                                        final double alturaProporcional =
+                                            valor == null ? 0 : (valor / 600) * 110;
 
-                                  return Column(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      Container(
+                                        return Container(
+                                          width: 16,
+                                          height: alturaProporcional,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF0D47A1),
+                                            borderRadius: BorderRadius.vertical(
+                                              top: Radius.circular(8),
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                  ),
+
+                                  // Linha na base das colunas
+                                  Container(
+                                    height: 2,
+                                    color: const Color(0xFF0D47A1),
+                                  ),
+                                  const SizedBox(height: 6),
+
+                                  // Letras dos dias da semana
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceAround,
+                                    children: List.generate(7, (index) {
+                                      return SizedBox(
                                         width: 16,
-                                        height: alturaProporcional,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF0D47A1),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
+                                        child: Text(
+                                          _diasLetras[index],
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.black,
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        _diasLetras[index],
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w900,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                }),
+                                      );
+                                    }),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -281,13 +427,16 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(7, (index) {
                   final isSelected = index == _diaSelecionadoIndex;
+                  final bool disponivel = consumo[index] != null;
                   return InkWell(
                     borderRadius: BorderRadius.circular(20),
-                    onTap: () {
-                      setState(() {
-                        _diaSelecionadoIndex = index;
-                      });
-                    },
+                    onTap: disponivel
+                        ? () {
+                            setState(() {
+                              _diaSelecionadoIndex = index;
+                            });
+                          }
+                        : null,
                     child: Container(
                       width: 40,
                       height: 40,
@@ -298,7 +447,9 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                             : Colors.white,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFF0D47A1),
+                          color: disponivel
+                              ? const Color(0xFF0D47A1)
+                              : Colors.grey.shade300,
                           width: 1.5,
                         ),
                       ),
@@ -307,9 +458,11 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF0D47A1),
+                          color: !disponivel
+                              ? Colors.grey.shade400
+                              : isSelected
+                                  ? Colors.white
+                                  : const Color(0xFF0D47A1),
                         ),
                       ),
                     ),
@@ -321,7 +474,8 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
               // Data por Extenso do Dia Selecionado
               Center(
                 child: Text(
-                  '${_diasNomes[_diaSelecionadoIndex]} - 27 de Outubro de 2026',
+                  '${_diasNomes[_diaSelecionadoIndex]} - ${dataSelecionada.day} de '
+                  '${_maiuscula(_meses[dataSelecionada.month - 1])} de ${dataSelecionada.year}',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -343,7 +497,7 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${_consumoSemanal[_diaSelecionadoIndex].toInt()} Litros',
+                      '${consumo[_diaSelecionadoIndex]!.toInt()} Litros',
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w900,

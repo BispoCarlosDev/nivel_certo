@@ -1,9 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:nivel_certo/screens/tela_cadastrarusuario.dart';
 import 'package:nivel_certo/screens/tela_minhascaixas.dart';
+import 'package:nivel_certo/screens/tela_recuperarsenha.dart';
+import 'package:nivel_certo/services/auth_service.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _loginController = TextEditingController();
+  final _senhaController = TextEditingController();
+  bool _ocultarSenha = true;
+  String? _erro;
+
+  @override
+  void dispose() {
+    _loginController.dispose();
+    _senhaController.dispose();
+    super.dispose();
+  }
+
+  // Só entra quem está cadastrado e informou a senha correta
+  void _entrar() {
+    final ok = AuthService.instance.login(
+      _loginController.text,
+      _senhaController.text,
+    );
+    if (!ok) {
+      setState(() => _erro = 'E-mail/celular ou senha incorretos.');
+      return;
+    }
+
+    // Vai para Minhas Caixas D'Água e remove o login da pilha,
+    // assim o botão voltar não retorna para a tela de login
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const MinhasCaixasScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +79,7 @@ class LoginScreen extends StatelessWidget {
 
               // Adicionando o campo para preencher o email ou telefone
               TextField(
+                controller: _loginController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   labelText: 'E-mail ou Telefone',
@@ -56,14 +95,21 @@ class LoginScreen extends StatelessWidget {
 
               // Adicionando o campo de senha
               TextField(
-                obscureText: true,
+                controller: _senhaController,
+                obscureText: _ocultarSenha,
                 decoration: InputDecoration(
                   labelText: 'Senha',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: const Icon(Icons.visibility_off),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _ocultarSenha ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () =>
+                        setState(() => _ocultarSenha = !_ocultarSenha),
+                  ),
                 ),
               ),
 
@@ -75,7 +121,12 @@ class LoginScreen extends StatelessWidget {
                 alignment: Alignment.center,
                 child: TextButton(
                   onPressed: () {
-
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const RecuperarSenhaScreen(),
+                      ),
+                    );
                   },
                   child: const Text(
                     'Esqueci Minha Senha',
@@ -87,6 +138,16 @@ class LoginScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
+              // Mensagem de erro de login (aparece só quando necessário)
+              if (_erro != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _erro!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red, fontSize: 14),
+                ),
+              ],
 
               // SizedBox para afastar o textbutton de esqueci a senha do botão de entrar
               const SizedBox(height: 24),
@@ -102,16 +163,7 @@ class LoginScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: () {
-                    // Vai para Minhas Caixas D'Água e remove o login da pilha,
-                    // assim o botão voltar não retorna para a tela de login
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MinhasCaixasScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: _entrar,
                   child: const Text(
                     'Entrar',
                     style: TextStyle(

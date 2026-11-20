@@ -25,6 +25,13 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
     final double porcentagem = (_litrosAtuais / widget.capacidadeTotal).clamp(0.0, 1.0);
     final int percentualInt = (porcentagem * 100).round();
 
+    // Cor da água: normal, amarelo abaixo de 30% e vermelho abaixo de 15%
+    final Color corAgua = porcentagem < 0.15
+        ? Colors.red
+        : porcentagem < 0.30
+            ? Colors.amber
+            : const Color(0xFF0288D1);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -123,7 +130,7 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
                             width: double.infinity,
                             // Altura proporcional da água baseada nos 280px totais
                             height: 280 * porcentagem,
-                            color: const Color(0xFF0288D1),
+                            color: corAgua,
                           ),
                         ],
                       ),

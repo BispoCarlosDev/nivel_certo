@@ -1,7 +1,45 @@
 import 'package:flutter/material.dart';
 
-class CadastroCaixaScreen extends StatelessWidget {
-  const CadastroCaixaScreen({super.key});
+class CadastroCaixaScreen extends StatefulWidget {
+  // Quando recebe uma caixa, a tela funciona como edição
+  final Map<String, String>? caixa;
+
+  const CadastroCaixaScreen({super.key, this.caixa});
+
+  @override
+  State<CadastroCaixaScreen> createState() => _CadastroCaixaScreenState();
+}
+
+class _CadastroCaixaScreenState extends State<CadastroCaixaScreen> {
+  late final _nomeController = TextEditingController(text: widget.caixa?['nome']);
+  late final _marcaController = TextEditingController(text: widget.caixa?['marca']);
+  late final _tamanhoController = TextEditingController(text: widget.caixa?['tamanho']);
+  late final _modeloController = TextEditingController(text: widget.caixa?['modelo']);
+
+  @override
+  void dispose() {
+    _nomeController.dispose();
+    _marcaController.dispose();
+    _tamanhoController.dispose();
+    _modeloController.dispose();
+    super.dispose();
+  }
+
+  void _confirmar() {
+    final caixa = widget.caixa;
+    if (caixa == null) {
+      Navigator.pop(context);
+      return;
+    }
+    final nome = _nomeController.text.trim();
+    if (nome.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Informe o nome da caixa.')),
+      );
+      return;
+    }
+    Navigator.pop(context, {...caixa, 'nome': nome});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,8 +73,10 @@ class CadastroCaixaScreen extends StatelessWidget {
               const SizedBox(height: 32),
 
               // Inserindo o título da Tela Cadastrar Caixas Dagua
-              const Text(
-                'Cadastrar Caixa D\'Água',
+              Text(
+                widget.caixa == null
+                    ? 'Cadastrar Caixa D\'Água'
+                    : 'Editar Caixa D\'Água',
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
@@ -96,6 +136,7 @@ class CadastroCaixaScreen extends StatelessWidget {
 
               // Inserindo o campo Nome da Caixa
               TextField(
+                controller: _nomeController,
                 decoration: InputDecoration(
                   labelText: 'Nome da Caixa',
                   border: OutlineInputBorder(
@@ -107,6 +148,7 @@ class CadastroCaixaScreen extends StatelessWidget {
 
               // Inserindo o campo marca da Caixa
               TextField(
+                controller: _marcaController,
                 readOnly: true,
                 decoration: InputDecoration(
                   labelText: 'Marca Caixa D\'Água',
@@ -120,6 +162,7 @@ class CadastroCaixaScreen extends StatelessWidget {
 
               // Inserindo o campo de tamanho da caixa
               TextField(
+                controller: _tamanhoController,
                 readOnly: true,
                 decoration: InputDecoration(
                   labelText: 'Tamanho (Litros)',
@@ -133,6 +176,7 @@ class CadastroCaixaScreen extends StatelessWidget {
 
               // Inserindo o modelo da caixa
               TextField(
+                controller: _modeloController,
                 readOnly: true,
                 decoration: InputDecoration(
                   labelText: 'Modelo',
@@ -155,10 +199,7 @@ class CadastroCaixaScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onPressed: () {
-                    // Ação de confirmar o cadastro da caixa e voltar para Minhas Caixas
-                    Navigator.pop(context);
-                  },
+                  onPressed: _confirmar,
                   child: const Text(
                     'Confirmar',
                     style: TextStyle(
