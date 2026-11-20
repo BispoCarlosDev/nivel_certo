@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:nivel_certo/screens/tela_cadastrarcaixa.dart';
+import 'package:nivel_certo/screens/tela_niveldeagua.dart';
 
 class MinhasCaixasScreen extends StatefulWidget {
   const MinhasCaixasScreen({super.key});
@@ -103,6 +105,10 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
         ),
         onPressed: () {
           // Ação para navegar até a tela de Cadastro de Caixa (CadastroCaixaScreen)
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CadastroCaixaScreen()),
+          );
         },
         child: const Icon(Icons.add, color: Colors.white, size: 30),
       ),
@@ -158,8 +164,20 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () {
-                // Ação ao clicar no card da caixa (ex: abrir a tela de nível da água)
-                print('Clicou na caixa: ${caixa['nome']}');
+                // Ação ao clicar no card da caixa: abre a tela de nível de água.
+                // O tamanho vem como texto (ex: '500L'), então extraímos só os números.
+                final capacidade = double.parse(
+                  caixa['tamanho']!.replaceAll(RegExp(r'[^0-9]'), ''),
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NivelAguaScreen(
+                      nomeCaixa: caixa['nome']!,
+                      capacidadeTotal: capacidade,
+                    ),
+                  ),
+                );
               },
               child: Padding(
                 padding: const EdgeInsets.all(16),

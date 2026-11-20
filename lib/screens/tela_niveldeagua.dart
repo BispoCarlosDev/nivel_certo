@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nivel_certo/screens/tela_historicoconsumo.dart';
 
 class NivelAguaScreen extends StatefulWidget {
   final String nomeCaixa;
@@ -196,7 +197,16 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
                     ),
                   ),
                   onPressed: () {
-                    // Navegação para a tela de histórico
+                    // Navegação para a tela de histórico, levando os dados da caixa
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => HistoricoConsumoScreen(
+                          nomeCaixa: widget.nomeCaixa,
+                          capacidadeTotal: widget.capacidadeTotal,
+                        ),
+                      ),
+                    );
                   },
                   child: const Text(
                     'Histórico de Consumo',

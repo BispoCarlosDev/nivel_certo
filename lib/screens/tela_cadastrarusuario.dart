@@ -110,7 +110,13 @@ class CadastroUsuarioScreen extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
-
+                    // Após cadastrar, volta para a tela de login
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Cadastro realizado! Faça seu login.'),
+                      ),
+                    );
                   },
                   child: const Text(
                     'Cadastrar-se',

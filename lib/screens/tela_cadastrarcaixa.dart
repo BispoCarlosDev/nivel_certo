@@ -156,7 +156,8 @@ class CadastroCaixaScreen extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
-                    // Ação de confirmar o cadastro da caixa
+                    // Ação de confirmar o cadastro da caixa e voltar para Minhas Caixas
+                    Navigator.pop(context);
                   },
                   child: const Text(
                     'Confirmar',

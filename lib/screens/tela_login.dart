@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nivel_certo/screens/tela_cadastrarusuario.dart';
+import 'package:nivel_certo/screens/tela_minhascaixas.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -102,7 +103,14 @@ class LoginScreen extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
-
+                    // Vai para Minhas Caixas D'Água e remove o login da pilha,
+                    // assim o botão voltar não retorna para a tela de login
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MinhasCaixasScreen(),
+                      ),
+                    );
                   },
                   child: const Text(
                     'Entrar',
