@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:nivel_certo/services/auth_service.dart';
 
@@ -10,67 +9,66 @@ class RecuperarSenhaScreen extends StatefulWidget {
 }
 
 class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
-  final _contatoController = TextEditingController();
+  final _emailController = TextEditingController();
   final _codigoController = TextEditingController();
   final _novaSenhaController = TextEditingController();
   final _confirmarController = TextEditingController();
 
-  // Etapa 1: informar e-mail/celular | Etapa 2: código + nova senha
+  // Etapa 1: informar o e-mail | Etapa 2: código recebido + nova senha
   int _etapa = 1;
-  String _codigoGerado = '';
+  bool _carregando = false;
+  bool _codigoConfirmado = false;
+  bool _ocultarSenha = true;
   String? _erro;
 
   @override
   void dispose() {
-    _contatoController.dispose();
+    _emailController.dispose();
     _codigoController.dispose();
     _novaSenhaController.dispose();
     _confirmarController.dispose();
     super.dispose();
   }
 
-  void _enviarCodigo() {
-    final contato = _contatoController.text;
-    if (contato.trim().isEmpty) {
-      setState(() => _erro = 'Informe seu e-mail ou celular.');
-      return;
-    }
-    if (!AuthService.instance.contatoExiste(contato)) {
-      setState(() => _erro = 'Não encontramos uma conta com esse e-mail ou celular.');
+  Future<void> _enviarCodigo() async {
+    final email = _emailController.text.trim();
+    if (!AuthService.emailValido(email)) {
+      setState(() => _erro = 'Informe um e-mail válido.');
       return;
     }
 
-    // Gera um código de 6 dígitos
-    _codigoGerado = (Random().nextInt(900000) + 100000).toString();
     setState(() {
+      _carregando = true;
       _erro = null;
+    });
+    try {
+      await AuthService.instance.enviarCodigoRecuperacao(email);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _carregando = false;
+        _erro = AuthService.mensagemDe(e);
+      });
+      return;
+    }
+    if (!mounted) return;
+
+    setState(() {
+      _carregando = false;
       _etapa = 2;
     });
-
-    // PROTÓTIPO: como não há e-mail/SMS de verdade, mostramos o código na tela.
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Código de verificação'),
-        content: Text(
-          'Seu código é $_codigoGerado\n\n'
-          '(Simulação: em um app real, ele seria enviado por e-mail ou SMS.)',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Se o e-mail estiver cadastrado, enviamos um código.'),
       ),
     );
   }
 
-  void _redefinirSenha() {
+  Future<void> _redefinirSenha() async {
     final nova = _novaSenhaController.text;
     String? erro;
-    if (_codigoController.text.trim() != _codigoGerado) {
-      erro = 'Código incorreto.';
+    if (!_codigoConfirmado && _codigoController.text.trim().isEmpty) {
+      erro = 'Digite o código recebido por e-mail.';
     } else if (nova.length < 6) {
       erro = 'A senha deve ter pelo menos 6 caracteres.';
     } else if (nova != _confirmarController.text) {
@@ -81,7 +79,29 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
       return;
     }
 
-    AuthService.instance.redefinirSenha(_contatoController.text, nova);
+    setState(() {
+      _carregando = true;
+      _erro = null;
+    });
+    try {
+      if (!_codigoConfirmado) {
+        await AuthService.instance.verificarCodigo(
+          _emailController.text,
+          _codigoController.text,
+        );
+        _codigoConfirmado = true;
+      }
+      await AuthService.instance.definirNovaSenha(nova);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _carregando = false;
+        _erro = AuthService.mensagemDe(e);
+      });
+      return;
+    }
+    if (!mounted) return;
+
     final messenger = ScaffoldMessenger.of(context);
     Navigator.pop(context); // Volta para o login
     messenger.showSnackBar(
@@ -89,9 +109,10 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
     );
   }
 
-  InputDecoration _decoracao(String label) => InputDecoration(
+  InputDecoration _decoracao(String label, {Widget? sufixo}) => InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        suffixIcon: sufixo,
       );
 
   @override
@@ -133,8 +154,8 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
               const SizedBox(height: 12),
               Text(
                 _etapa == 1
-                    ? 'Informe o e-mail ou celular cadastrado para receber um código de verificação.'
-                    : 'Digite o código recebido e escolha sua nova senha.',
+                    ? 'Informe o e-mail cadastrado para receber um código de verificação.'
+                    : 'Digite o código recebido por e-mail e escolha sua nova senha.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 15, color: Colors.black54),
               ),
@@ -142,26 +163,36 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
 
               if (_etapa == 1)
                 TextField(
-                  controller: _contatoController,
+                  controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: _decoracao('E-mail ou Celular'),
+                  decoration: _decoracao('E-mail'),
                 )
               else ...[
                 TextField(
                   controller: _codigoController,
                   keyboardType: TextInputType.number,
+                  readOnly: _codigoConfirmado,
                   decoration: _decoracao('Código de verificação'),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _novaSenhaController,
-                  obscureText: true,
-                  decoration: _decoracao('Nova Senha'),
+                  obscureText: _ocultarSenha,
+                  decoration: _decoracao(
+                    'Nova Senha',
+                    sufixo: IconButton(
+                      icon: Icon(
+                        _ocultarSenha ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setState(() => _ocultarSenha = !_ocultarSenha),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _confirmarController,
-                  obscureText: true,
+                  obscureText: _ocultarSenha,
                   decoration: _decoracao('Confirmar Nova Senha'),
                 ),
               ],
@@ -186,18 +217,47 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onPressed: _etapa == 1 ? _enviarCodigo : _redefinirSenha,
-                  child: Text(
-                    _etapa == 1 ? 'Enviar Código' : 'Redefinir Senha',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  onPressed: _carregando
+                      ? null
+                      : (_etapa == 1 ? _enviarCodigo : _redefinirSenha),
+                  child: _carregando
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          _etapa == 1 ? 'Enviar Código' : 'Redefinir Senha',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 4),
+
+              if (_etapa == 2)
+                TextButton(
+                  onPressed: _carregando || _codigoConfirmado
+                      ? null
+                      : () => setState(() {
+                            _etapa = 1;
+                            _erro = null;
+                          }),
+                  child: const Text(
+                    'Reenviar código',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF0D47A1),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
 
               TextButton(
                 onPressed: () => Navigator.pop(context),

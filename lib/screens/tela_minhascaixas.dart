@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:nivel_certo/models/caixa.dart';
 import 'package:nivel_certo/screens/tela_cadastrarcaixa.dart';
+import 'package:nivel_certo/screens/tela_login.dart';
 import 'package:nivel_certo/screens/tela_niveldeagua.dart';
+import 'package:nivel_certo/services/auth_service.dart';
+import 'package:nivel_certo/services/caixa_service.dart';
 
 class MinhasCaixasScreen extends StatefulWidget {
   const MinhasCaixasScreen({super.key});
@@ -10,37 +14,97 @@ class MinhasCaixasScreen extends StatefulWidget {
 }
 
 class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
-  // Exemplo de lista de dados para preencher os cards das caixas D'Água
-  final _caixas = [
-    {
-      'codigo': '001',
-      'nome': 'Caixa Principal',
-      'marca': 'Genérica',
-      'modelo': 'Redonda',
-      'tamanho': '500L',
-    },
-    {
-      'codigo': '002',
-      'nome': 'Caixa dos Fundos',
-      'marca': 'Fortlev',
-      'modelo': 'Redonda',
-      'tamanho': '500L',
-    },
-    {
-      'codigo': '003',
-      'nome': 'Caixa Reserva',
-      'marca': 'Infibra',
-      'modelo': 'Redonda',
-      'tamanho': '1000L',
-    },
-    {
-      'codigo': '004',
-      'nome': 'Caixa Reserva',
-      'marca': 'Infibra',
-      'modelo': 'Redonda',
-      'tamanho': '1000L',
-    },
-  ];
+  List<Caixa> _caixas = [];
+  bool _carregando = true;
+  String? _erro;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregar();
+  }
+
+  Future<void> _carregar({bool mostrarCarregando = true}) async {
+    if (mostrarCarregando) {
+      setState(() {
+        _carregando = true;
+        _erro = null;
+      });
+    }
+    try {
+      final caixas = await CaixaService.instance.listarCaixas();
+      if (!mounted) return;
+      setState(() {
+        _caixas = caixas;
+        _carregando = false;
+        _erro = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _carregando = false;
+        _erro = AuthService.mensagemDe(e);
+      });
+    }
+  }
+
+  Future<void> _sair() async {
+    await AuthService.instance.sair();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (rota) => false,
+    );
+  }
+
+  // Abre a tela de cadastro e recarrega a lista se algo foi salvo
+  Future<void> _abrirCadastro({Caixa? caixa}) async {
+    final salvou = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (context) => CadastroCaixaScreen(caixa: caixa)),
+    );
+    if (salvou == true) _carregar(mostrarCarregando: false);
+  }
+
+  // Pede confirmação antes de excluir a caixa
+  Future<void> _confirmarExclusao(Caixa caixa) async {
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir caixa'),
+        content: Text(
+          'Deseja realmente excluir a caixa "${caixa.nome}"? '
+          'Essa ação não poderá ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmou != true) return;
+
+    try {
+      await CaixaService.instance.excluirCaixa(caixa.id);
+      if (!mounted) return;
+      setState(() => _caixas.removeWhere((c) => c.id == caixa.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Caixa excluída.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AuthService.mensagemDe(e))),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +130,12 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
                       color: Color(0xFF0D47A1),
                     ),
                   ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Sair',
+                    icon: const Icon(Icons.logout, color: Color(0xFF0D47A1)),
+                    onPressed: _sair,
+                  ),
                 ],
               ),
               const SizedBox(height: 32),
@@ -81,11 +151,22 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Seleção de Opções Com Caixas ou sem Caixas
+              // Seleção de Opções: carregando, erro, sem caixas ou com caixas
               Expanded(
-                child: _caixas.isNotEmpty
-                    ? _construirListaCaixas()
-                    : _construirEstadoVazio(),
+                child: _carregando
+                    ? const Center(child: CircularProgressIndicator())
+                    : _erro != null
+                        ? _construirErro()
+                        : RefreshIndicator(
+                            onRefresh: () => _carregar(mostrarCarregando: false),
+                            child: _caixas.isNotEmpty
+                                ? _construirListaCaixas()
+                                : ListView(
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(),
+                                    children: [_construirEstadoVazio()],
+                                  ),
+                          ),
               ),
             ],
           ),
@@ -100,63 +181,38 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
             width: 2,
           ),
         ),
-        onPressed: () {
-          // Ação para navegar até a tela de Cadastro de Caixa (CadastroCaixaScreen)
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CadastroCaixaScreen()),
-          );
-        },
+        onPressed: () => _abrirCadastro(),
         child: const Icon(Icons.add, color: Colors.white, size: 30),
       ),
     );
   }
 
-  // Abre a tela de cadastro com os dados da caixa para edição
-  Future<void> _editarCaixa(Map<String, String> caixa) async {
-    final atualizada = await Navigator.push<Map<String, String>>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CadastroCaixaScreen(caixa: caixa),
-      ),
-    );
-    if (atualizada != null) {
-      setState(() {
-        final index = _caixas.indexOf(caixa);
-        if (index != -1) _caixas[index] = atualizada;
-      });
-    }
-  }
-
-  // Pede confirmação antes de excluir a caixa
-  Future<void> _confirmarExclusao(Map<String, String> caixa) async {
-    final confirmou = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Excluir caixa'),
-        content: Text(
-          'Deseja realmente excluir a caixa "${caixa['nome']}"? '
-          'Essa ação não poderá ser desfeita.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
+  // Widget para quando não foi possível carregar as caixas
+  Widget _construirErro() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _erro!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16, color: Colors.black54),
           ),
+          const SizedBox(height: 12),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+            onPressed: _carregar,
+            child: const Text(
+              'Tentar novamente',
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF0D47A1),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
-    if (confirmou == true) {
-      setState(() => _caixas.remove(caixa));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Caixa excluída.')),
-      );
-    }
   }
 
   // Widget para o estado quando NÃO HÁ caixas cadastradas
@@ -194,6 +250,8 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
   // Widget para o estado com caixas cadastradas em formato de Cards
   Widget _construirListaCaixas() {
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 80),
       itemCount: _caixas.length,
       itemBuilder: (context, index) {
         final caixa = _caixas[index];
@@ -208,18 +266,11 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () {
-                // Ação ao clicar no card da caixa: abre a tela de nível de água.
-                // O tamanho vem como texto (ex: '500L'), então extraímos só os números.
-                final capacidade = double.parse(
-                  caixa['tamanho']!.replaceAll(RegExp(r'[^0-9]'), ''),
-                );
+                // Ação ao clicar no card da caixa: abre a tela de nível de água
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => NivelAguaScreen(
-                      nomeCaixa: caixa['nome']!,
-                      capacidadeTotal: capacidade,
-                    ),
+                    builder: (context) => NivelAguaScreen(caixa: caixa),
                   ),
                 );
               },
@@ -233,7 +284,7 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Código: ${caixa['codigo']}',
+                            'Código: ${caixa.codigo}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15,
@@ -241,7 +292,7 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Nome: ${caixa['nome']}',
+                            'Nome: ${caixa.nome}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15,
@@ -249,7 +300,7 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Marca: ${caixa['marca']}',
+                            'Marca: ${caixa.marca}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15,
@@ -257,7 +308,7 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Modelo: ${caixa['modelo']}',
+                            'Modelo: ${caixa.formatoTexto}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15,
@@ -265,7 +316,7 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Tamanho: ${caixa['tamanho']}',
+                            'Tamanho: ${caixa.capacidadeTexto}L',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 15,
@@ -278,7 +329,7 @@ class _MinhasCaixasScreenState extends State<MinhasCaixasScreen> {
                       icon: const Icon(Icons.more_vert, color: Colors.white),
                       onSelected: (opcao) {
                         if (opcao == 'editar') {
-                          _editarCaixa(caixa);
+                          _abrirCadastro(caixa: caixa);
                         } else {
                           _confirmarExclusao(caixa);
                         }

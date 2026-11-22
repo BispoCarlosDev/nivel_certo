@@ -1,14 +1,18 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:nivel_certo/models/caixa.dart';
+import 'package:nivel_certo/services/caixa_service.dart';
 
 class HistoricoConsumoScreen extends StatefulWidget {
-  final String nomeCaixa;
-  final double capacidadeTotal;
+  final Caixa caixa;
+
+  // false = Histórico de Consumo | true = Histórico de Abastecimento
+  final bool abastecimento;
 
   const HistoricoConsumoScreen({
     super.key,
-    this.nomeCaixa = 'Nome da Caixa',
-    this.capacidadeTotal = 1000.0,
+    required this.caixa,
+    this.abastecimento = false,
   });
 
   @override
@@ -17,6 +21,8 @@ class HistoricoConsumoScreen extends StatefulWidget {
 
 class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
   static const int _quantidadeSemanas = 5;
+  static const double _alturaBarras = 110;
+  static const double _larguraLegenda = 48;
 
   final List<String> _diasLetras = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
   final List<String> _diasNomes = [
@@ -43,11 +49,20 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
     'dezembro',
   ];
 
+  bool get _ab => widget.abastecimento;
+
   late final DateTime _hoje;
   late final DateTime _inicioSemanaAtual; // Domingo da semana de hoje
   late DateTime _ultimaSemanaExibida; // Domingo da semana mais à direita do seletor
   late DateTime _inicioSemanaSelecionada; // Domingo da semana selecionada
   late int _diaSelecionadoIndex; // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+
+  // Consumo dos 7 dias da semana selecionada (domingo a sábado)
+  List<double> _litros = List.filled(7, 0);
+  List<bool> _temDados = List.filled(7, false);
+  bool _carregando = true;
+  bool _erro = false;
+  int _requisicao = 0;
 
   @override
   void initState() {
@@ -58,6 +73,7 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
     _ultimaSemanaExibida = _inicioSemanaAtual;
     _inicioSemanaSelecionada = _inicioSemanaAtual;
     _diaSelecionadoIndex = _hoje.weekday % 7;
+    _carregarSemana();
   }
 
   DateTime _domingoDa(DateTime data) =>
@@ -65,6 +81,12 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
 
   DateTime _somarDias(DateTime data, int dias) =>
       DateTime(data.year, data.month, data.day + dias);
+
+  String _chave(DateTime data) => '${data.year}-${data.month}-${data.day}';
+
+  // Dias que ainda não aconteceram não podem ser selecionados
+  bool _ehFuturo(int indice) =>
+      _somarDias(_inicioSemanaSelecionada, indice).isAfter(_hoje);
 
   // A semana 1 do ano é a que contém o dia 1º de janeiro (semanas de domingo a sábado)
   int _numeroDaSemana(DateTime inicio) {
@@ -91,17 +113,54 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
         '(Semana ${_numeroDaSemana(inicio)})';
   }
 
-  // Consumo em litros dos 7 dias da semana (domingo a sábado).
-  // Dias que ainda não aconteceram ficam sem valor (null).
-  List<double?> _consumoDaSemana(DateTime inicio) {
-    final semente =
-        DateTime.utc(inicio.year, inicio.month, inicio.day).millisecondsSinceEpoch ~/
-            86400000;
-    final aleatorio = Random(semente);
-    return List.generate(7, (i) {
-      final valor = (280 + aleatorio.nextInt(300)).toDouble();
-      return _somarDias(inicio, i).isAfter(_hoje) ? null : valor;
+  // Busca no banco o consumo de cada dia da semana selecionada
+  Future<void> _carregarSemana() async {
+    final requisicao = ++_requisicao;
+    final inicio = _inicioSemanaSelecionada;
+    try {
+      final fim = _somarDias(inicio, 6);
+      final consumo = _ab
+          ? await CaixaService.instance.abastecimentoDiario(
+              widget.caixa.id,
+              inicio,
+              fim,
+            )
+          : await CaixaService.instance.consumoDiario(
+              widget.caixa.id,
+              inicio,
+              fim,
+            );
+      // Ignora respostas de semanas que já não estão selecionadas
+      if (!mounted || requisicao != _requisicao) return;
+
+      final porData = {for (final c in consumo) _chave(c.data): c};
+      final litros = <double>[];
+      final temDados = <bool>[];
+      for (var i = 0; i < 7; i++) {
+        final dia = porData[_chave(_somarDias(inicio, i))];
+        litros.add(dia?.litros ?? 0);
+        temDados.add((dia?.leituras ?? 0) > 0);
+      }
+      setState(() {
+        _litros = litros;
+        _temDados = temDados;
+        _carregando = false;
+      });
+    } catch (_) {
+      if (!mounted || requisicao != _requisicao) return;
+      setState(() {
+        _carregando = false;
+        _erro = true;
+      });
+    }
+  }
+
+  void _recarregar() {
+    setState(() {
+      _carregando = true;
+      _erro = false;
     });
+    _carregarSemana();
   }
 
   void _selecionarSemana(DateTime inicio) {
@@ -109,7 +168,10 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
       _inicioSemanaSelecionada = inicio;
       final data = _somarDias(inicio, _diaSelecionadoIndex);
       if (data.isAfter(_hoje)) _diaSelecionadoIndex = _hoje.weekday % 7;
+      _carregando = true;
+      _erro = false;
     });
+    _carregarSemana();
   }
 
   // Abre o calendário para buscar qualquer data; seleciona a semana e o dia escolhidos
@@ -127,6 +189,8 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
       final inicio = _domingoDa(data);
       _inicioSemanaSelecionada = inicio;
       _diaSelecionadoIndex = data.weekday % 7;
+      _carregando = true;
+      _erro = false;
 
       // Se a semana escolhida é mais antiga que as exibidas, o seletor se desloca até ela
       final primeiraExibida =
@@ -137,20 +201,72 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
             ultima.isAfter(_inicioSemanaAtual) ? _inicioSemanaAtual : ultima;
       }
     });
+    _carregarSemana();
+  }
+
+  // Valor máximo do eixo do gráfico, arredondado para cima
+  double _tetoDoGrafico(double maximo) {
+    final passo = maximo <= 1000
+        ? 100.0
+        : maximo <= 5000
+            ? 500.0
+            : 1000.0;
+    final teto = (maximo / passo).ceil() * passo;
+    return teto < passo ? passo : teto;
+  }
+
+  // Linhas de referência do gráfico: topo, metade e média da semana
+  List<Widget> _linhasGuia(double teto, double? media) {
+    double posicao(double valor) =>
+        _alturaBarras - (valor / teto) * _alturaBarras;
+
+    final yMedia = media == null ? null : posicao(media);
+    final yMeio = posicao(teto / 2);
+    final linhas = <Widget>[];
+
+    void adicionar(double y, String texto, Color cor, {bool pontilhada = false}) {
+      linhas.add(
+        Positioned(
+          top: y - 7,
+          left: 0,
+          right: 0,
+          child: _buildLinhaGuia(texto, cor, isDotted: pontilhada),
+        ),
+      );
+    }
+
+    if (yMedia == null || yMedia > 14) {
+      adicionar(0, '${formatarLitros(teto)}L', Colors.grey.shade400);
+    }
+    if (yMedia == null || (yMedia - yMeio).abs() > 14) {
+      adicionar(yMeio, '${formatarLitros(teto / 2)}L', Colors.grey.shade400);
+    }
+    if (yMedia != null) {
+      adicionar(yMedia, 'Média', Colors.grey.shade500, pontilhada: true);
+    }
+    return linhas;
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<double?> consumo = _consumoDaSemana(_inicioSemanaSelecionada);
-    final List<double> diasComDados = consumo.whereType<double>().toList();
-
-    // Cálculo da média de consumo diário da semana
-    final double mediaConsumo = diasComDados.isEmpty
-        ? 0
+    // Média de consumo diário, considerando só os dias que têm leituras
+    final List<double> diasComDados = [
+      for (var i = 0; i < 7; i++)
+        if (_temDados[i] && !_ehFuturo(i)) _litros[i],
+    ];
+    final double? mediaConsumo = diasComDados.isEmpty
+        ? null
         : diasComDados.reduce((a, b) => a + b) / diasComDados.length;
+    final double totalSemana =
+        diasComDados.isEmpty ? 0.0 : diasComDados.reduce((a, b) => a + b);
+
+    final double teto = _tetoDoGrafico(
+      diasComDados.isEmpty ? 0.0 : diasComDados.reduce(max),
+    );
 
     final DateTime dataSelecionada =
         _somarDias(_inicioSemanaSelecionada, _diaSelecionadoIndex);
+    final bool diaComDados = _temDados[_diaSelecionadoIndex];
     final List<DateTime> semanas = List.generate(
       _quantidadeSemanas,
       (i) => _somarDias(
@@ -188,10 +304,10 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Nome Histórico de Consumo
-              const Text(
-                'Histórico de Consumo',
-                style: TextStyle(
+              // Nome da tela (Consumo ou Abastecimento)
+              Text(
+                _ab ? 'Histórico de Abastecimento' : 'Histórico de Consumo',
+                style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
                   color: Color(0xFF0D47A1),
@@ -214,7 +330,7 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Caixa: ${widget.nomeCaixa}',
+                      'Caixa: ${widget.caixa.nome}',
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -223,7 +339,7 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Capacidade: ${widget.capacidadeTotal.toInt()} L',
+                      'Capacidade: ${widget.caixa.capacidadeTexto} L',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -273,7 +389,7 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
               ),
               const SizedBox(height: 8),
 
-              // Texto com intervalo da Semana Selecionada
+              // Texto com intervalo da Semana Selecionada e botão do calendário
               Row(
                 children: [
                   Expanded(
@@ -298,7 +414,11 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              if (_carregando)
+                const LinearProgressIndicator(minHeight: 2)
+              else
+                const SizedBox(height: 2),
+              const SizedBox(height: 16),
 
               // Card do Gráfico de Média de Consumo Diário
               Container(
@@ -312,7 +432,11 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${mediaConsumo.round()} Litros',
+                      mediaConsumo == null
+                          ? '-- Litros'
+                          : _ab
+                              ? '${totalSemana.round()} Litros'
+                              : '${mediaConsumo.round()} Litros',
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w900,
@@ -320,9 +444,9 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                         height: 1.0,
                       ),
                     ),
-                    const Text(
-                      'Média de Consumo Diário',
-                      style: TextStyle(
+                    Text(
+                      _ab ? 'Recebidos na Semana' : 'Média de Consumo Diário',
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: Colors.black,
@@ -333,44 +457,37 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                     // Gráfico de Barras Customizado
                     SizedBox(
                       height: 150,
-                      child: Stack(
+                      child: Column(
                         children: [
-                          // Linhas de Guia e Legendas Laterais (500L, Média, 250L)
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildLinhaGuia('500L', Colors.grey.shade400),
-                              _buildLinhaGuia(
-                                'Média',
-                                Colors.grey.shade500,
-                                isDotted: true,
-                              ),
-                              _buildLinhaGuia('250L', Colors.grey.shade400),
-                              const SizedBox(
-                                height: 20,
-                              ), // Compensação para o alinhamento das letras (D, S, T...)
-                            ],
-                          ),
+                          SizedBox(
+                            height: _alturaBarras,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                // Linhas de Guia e Legendas Laterais
+                                ..._linhasGuia(teto, mediaConsumo),
 
-                          // Desenho das Barras dos Dias da Semana (Com margem para não encostar na legenda)
-                          Positioned.fill(
-                            child: Padding(
-                              padding: const EdgeInsets.only(
-                                right: 45.0,
-                              ), // Garante o recuo exato para a legenda lateral
-                              child: Column(
-                                children: [
-                                  Expanded(
+                                // Desenho das Barras dos Dias da Semana (Com margem para não encostar na legenda)
+                                Positioned.fill(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(
+                                      right: _larguraLegenda + 5,
+                                    ), // Garante o recuo exato para a legenda lateral
                                     child: Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceAround,
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: List.generate(7, (index) {
-                                        final double? valor = consumo[index];
+                                        final double valor =
+                                            _ehFuturo(index) ? 0 : _litros[index];
                                         final double alturaProporcional =
-                                            valor == null ? 0 : (valor / 600) * 110;
+                                            (valor / teto * _alturaBarras)
+                                                .clamp(0.0, _alturaBarras);
 
-                                        return Container(
+                                        return AnimatedContainer(
+                                          duration:
+                                              const Duration(milliseconds: 400),
+                                          curve: Curves.easeOutCubic,
                                           width: 16,
                                           height: alturaProporcional,
                                           decoration: const BoxDecoration(
@@ -383,35 +500,44 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                                       }),
                                     ),
                                   ),
+                                ),
+                              ],
+                            ),
+                          ),
 
-                                  // Linha na base das colunas
-                                  Container(
-                                    height: 2,
-                                    color: const Color(0xFF0D47A1),
-                                  ),
-                                  const SizedBox(height: 6),
+                          // Linha na base das colunas
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              right: _larguraLegenda + 5,
+                            ),
+                            child: Container(
+                              height: 2,
+                              color: const Color(0xFF0D47A1),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
 
-                                  // Letras dos dias da semana
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceAround,
-                                    children: List.generate(7, (index) {
-                                      return SizedBox(
-                                        width: 16,
-                                        child: Text(
-                                          _diasLetras[index],
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w900,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                      );
-                                    }),
+                          // Letras dos dias da semana
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              right: _larguraLegenda + 5,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: List.generate(7, (index) {
+                                return SizedBox(
+                                  width: 16,
+                                  child: Text(
+                                    _diasLetras[index],
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.black,
+                                    ),
                                   ),
-                                ],
-                              ),
+                                );
+                              }),
                             ),
                           ),
                         ],
@@ -420,6 +546,27 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                   ],
                 ),
               ),
+              if (_erro) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _ab
+                      ? 'Não foi possível carregar o abastecimento desta semana.'
+                      : 'Não foi possível carregar o consumo desta semana.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red, fontSize: 14),
+                ),
+                TextButton(
+                  onPressed: _recarregar,
+                  child: const Text(
+                    'Tentar novamente',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF0D47A1),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
 
               // Botões Seletores de Dias da Semana (D, S, T, Q, Q, S, S)
@@ -427,7 +574,7 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(7, (index) {
                   final isSelected = index == _diaSelecionadoIndex;
-                  final bool disponivel = consumo[index] != null;
+                  final bool disponivel = !_ehFuturo(index);
                   return InkWell(
                     borderRadius: BorderRadius.circular(20),
                     onTap: disponivel
@@ -497,7 +644,9 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${consumo[_diaSelecionadoIndex]!.toInt()} Litros',
+                      diaComDados
+                          ? '${_litros[_diaSelecionadoIndex].round()} Litros'
+                          : 'Sem dados',
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w900,
@@ -506,9 +655,15 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    const Text(
-                      'Consumidos nesta data',
-                      style: TextStyle(
+                    Text(
+                      !diaComDados
+                          ? 'Nenhuma leitura registrada nesta data'
+                          : _ab
+                              ? (_litros[_diaSelecionadoIndex] >= 1
+                                  ? 'Recebidos nesta data'
+                                  : 'Nenhuma água recebida nesta data')
+                              : 'Consumidos nesta data',
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: Colors.black,
@@ -526,44 +681,47 @@ class _HistoricoConsumoScreenState extends State<HistoricoConsumoScreen> {
 
   // Widget auxiliar para desenhar as linhas tracejadas/guias do gráfico
   Widget _buildLinhaGuia(String texto, Color cor, {bool isDotted = false}) {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 1,
-            color: isDotted ? Colors.transparent : cor,
-            child: isDotted
-                ? LayoutBuilder(
-                    builder: (context, constraints) {
-                      return Row(
-                        children: List.generate(
-                          (constraints.maxWidth / 6).floor(),
-                          (index) => Container(
-                            width: 3,
-                            height: 1,
-                            color: cor,
-                            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+    return SizedBox(
+      height: 14,
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 1,
+              color: isDotted ? Colors.transparent : cor,
+              child: isDotted
+                  ? LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Row(
+                          children: List.generate(
+                            (constraints.maxWidth / 6).floor(),
+                            (index) => Container(
+                              width: 3,
+                              height: 1,
+                              color: cor,
+                              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  )
-                : null,
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 40,
-          child: Text(
-            texto,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: cor,
+                        );
+                      },
+                    )
+                  : null,
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          SizedBox(
+            width: _larguraLegenda - 8,
+            child: Text(
+              texto,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: cor,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

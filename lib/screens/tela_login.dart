@@ -15,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _loginController = TextEditingController();
   final _senhaController = TextEditingController();
   bool _ocultarSenha = true;
+  bool _carregando = false;
   String? _erro;
 
   @override
@@ -25,15 +26,29 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // Só entra quem está cadastrado e informou a senha correta
-  void _entrar() {
-    final ok = AuthService.instance.login(
-      _loginController.text,
-      _senhaController.text,
-    );
-    if (!ok) {
-      setState(() => _erro = 'E-mail/celular ou senha incorretos.');
+  Future<void> _entrar() async {
+    final email = _loginController.text.trim();
+    final senha = _senhaController.text;
+    if (email.isEmpty || senha.isEmpty) {
+      setState(() => _erro = 'Informe seu e-mail e sua senha.');
       return;
     }
+
+    setState(() {
+      _carregando = true;
+      _erro = null;
+    });
+    try {
+      await AuthService.instance.login(email, senha);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _carregando = false;
+        _erro = AuthService.mensagemDe(e);
+      });
+      return;
+    }
+    if (!mounted) return;
 
     // Vai para Minhas Caixas D'Água e remove o login da pilha,
     // assim o botão voltar não retorna para a tela de login
@@ -74,15 +89,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              // SizedBox para afastar o nome do campo de email ou telefone
+              // SizedBox para afastar o nome do campo de e-mail
               const SizedBox(height: 40),
 
-              // Adicionando o campo para preencher o email ou telefone
+              // Adicionando o campo para preencher o e-mail
               TextField(
                 controller: _loginController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: 'E-mail ou Telefone',
+                  labelText: 'E-mail',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -90,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              // SizedBox para agastar o campo de email ou telefone do campo de senha
+              // SizedBox para afastar o campo de e-mail do campo de senha
               const SizedBox(height: 16),
 
               // Adicionando o campo de senha
@@ -163,16 +178,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: _entrar,
-                  child: const Text(
-                    'Entrar',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                      color: Colors.white,
-                    ),
-                  ),
+                  onPressed: _carregando ? null : _entrar,
+                  child: _carregando
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Entrar',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
 
@@ -202,4 +226,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
+}

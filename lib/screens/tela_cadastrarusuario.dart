@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:nivel_certo/models/usuario.dart';
 import 'package:nivel_certo/services/auth_service.dart';
 
 class CadastroUsuarioScreen extends StatefulWidget {
@@ -13,13 +12,14 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
   final _nomeController = TextEditingController();
   final _dataController = TextEditingController();
   final _generoController = TextEditingController();
-  final _contatoController = TextEditingController();
+  final _emailController = TextEditingController();
   final _senhaController = TextEditingController();
   final _confirmarController = TextEditingController();
   final _generos = const ['Feminino', 'Masculino', 'Outro', 'Prefiro não informar'];
   DateTime? _dataNascimento;
   bool _ocultarSenha = true;
   bool _ocultarConfirmar = true;
+  bool _carregando = false;
   String? _erro;
 
   @override
@@ -27,7 +27,7 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
     _nomeController.dispose();
     _dataController.dispose();
     _generoController.dispose();
-    _contatoController.dispose();
+    _emailController.dispose();
     _senhaController.dispose();
     _confirmarController.dispose();
     super.dispose();
@@ -82,22 +82,20 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
     if (genero != null) _generoController.text = genero;
   }
 
-  void _cadastrar() {
+  Future<void> _cadastrar() async {
     final nome = _nomeController.text.trim();
-    final contato = _contatoController.text.trim();
+    final email = _emailController.text.trim();
     final senha = _senhaController.text;
 
     String? erro;
-    if (nome.isEmpty || contato.isEmpty || senha.isEmpty) {
-      erro = 'Preencha nome, e-mail ou celular e senha.';
-    } else if (!AuthService.contatoValido(contato)) {
-      erro = 'Informe um e-mail válido ou um celular com DDD.';
+    if (nome.isEmpty || email.isEmpty || senha.isEmpty) {
+      erro = 'Preencha nome, e-mail e senha.';
+    } else if (!AuthService.emailValido(email)) {
+      erro = 'Informe um e-mail válido.';
     } else if (senha.length < 6) {
       erro = 'A senha deve ter pelo menos 6 caracteres.';
     } else if (senha != _confirmarController.text) {
       erro = 'As senhas não conferem.';
-    } else if (AuthService.instance.contatoExiste(contato)) {
-      erro = 'Já existe uma conta com esse e-mail ou celular.';
     }
 
     if (erro != null) {
@@ -105,21 +103,42 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
       return;
     }
 
-    AuthService.instance.cadastrar(
-      Usuario(
+    setState(() {
+      _carregando = true;
+      _erro = null;
+    });
+
+    final bool precisaConfirmar;
+    try {
+      precisaConfirmar = await AuthService.instance.cadastrar(
         nome: nome,
-        dataNascimento: _dataController.text.trim(),
-        genero: _generoController.text,
-        contato: contato,
+        email: email,
         senha: senha,
-      ),
-    );
+        dataNascimento: _dataNascimento,
+        genero: _generoController.text,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _carregando = false;
+        _erro = AuthService.mensagemDe(e);
+      });
+      return;
+    }
+    if (!mounted) return;
 
     // Após cadastrar, volta para a tela de login
     final messenger = ScaffoldMessenger.of(context);
     Navigator.pop(context);
     messenger.showSnackBar(
-      const SnackBar(content: Text('Cadastro realizado! Faça seu login.')),
+      SnackBar(
+        content: Text(
+          precisaConfirmar
+              ? 'Cadastro realizado! Enviamos um e-mail de confirmação. '
+                  'Confirme antes de entrar.'
+              : 'Cadastro realizado! Faça seu login.',
+        ),
+      ),
     );
   }
 
@@ -196,12 +215,12 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Inserindo o campo para inserir o e-mail ou celular
+              // Inserindo o campo para inserir o e-mail
               TextField(
-                controller: _contatoController,
+                controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: 'E-mail ou Celular',
+                  labelText: 'E-mail',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
@@ -260,15 +279,24 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onPressed: _cadastrar,
-                  child: const Text(
-                    'Cadastrar-se',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  onPressed: _carregando ? null : _cadastrar,
+                  child: _carregando
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Cadastrar-se',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 4),
@@ -292,4 +320,4 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
       ),
     );
   }
-}
+}

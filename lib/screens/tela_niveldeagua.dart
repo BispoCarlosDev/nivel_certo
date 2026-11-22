@@ -1,28 +1,87 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:nivel_certo/models/caixa.dart';
 import 'package:nivel_certo/screens/tela_historicoconsumo.dart';
+import 'package:nivel_certo/services/caixa_service.dart';
 
 class NivelAguaScreen extends StatefulWidget {
-  final String nomeCaixa;
-  final double capacidadeTotal;
+  final Caixa caixa;
 
-  const NivelAguaScreen({
-    super.key,
-    this.nomeCaixa = 'Nome da Caixa',
-    this.capacidadeTotal = 1000.0,
-  });
+  const NivelAguaScreen({super.key, required this.caixa});
 
   @override
   State<NivelAguaScreen> createState() => _NivelAguaScreenState();
 }
 
 class _NivelAguaScreenState extends State<NivelAguaScreen> {
-  // Simulação do volume atual recebido que vai ser recebido da ESP32
-  double _litrosAtuais = 320.0;
+  Timer? _timer;
+  LeituraAtual? _leitura;
+  bool _carregando = true;
+  bool _erro = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarLeitura();
+    // Atualiza o nível automaticamente a cada 30 segundos
+    _timer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _carregarLeitura(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _carregarLeitura() async {
+    try {
+      final leitura = await CaixaService.instance.ultimaLeitura(widget.caixa.id);
+      if (!mounted) return;
+      setState(() {
+        _leitura = leitura;
+        _carregando = false;
+        _erro = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _carregando = false;
+        _erro = true;
+      });
+    }
+  }
+
+  bool get _semComunicacao =>
+      _leitura != null &&
+      DateTime.now().difference(_leitura!.dataHora) > const Duration(minutes: 15);
+
+  String _textoAtualizacao() {
+    if (_carregando) return 'Carregando...';
+    final leitura = _leitura;
+    if (leitura == null) {
+      return _erro
+          ? 'Não foi possível carregar o nível. Tentando novamente...'
+          : 'Aguardando a primeira leitura do dispositivo.';
+    }
+    final d = leitura.dataHora;
+    final dia = d.day.toString().padLeft(2, '0');
+    final mes = d.month.toString().padLeft(2, '0');
+    final hora = d.hour.toString().padLeft(2, '0');
+    final minuto = d.minute.toString().padLeft(2, '0');
+    final base = 'Última leitura: $dia/$mes às $hora:$minuto.';
+    return _semComunicacao ? '$base Dispositivo sem comunicação recente.' : base;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final double capacidade = widget.caixa.capacidadeLitros;
+    final double litros = _leitura?.volumeLitros ?? 0;
+
     // Cálculo do percentual limitado entre 0.0 e 1.0 (0% a 100%)
-    final double porcentagem = (_litrosAtuais / widget.capacidadeTotal).clamp(0.0, 1.0);
+    final double porcentagem = (litros / capacidade).clamp(0.0, 1.0);
     final int percentualInt = (porcentagem * 100).round();
 
     // Cor da água: normal, amarelo abaixo de 30% e vermelho abaixo de 15%
@@ -84,7 +143,7 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Caixa: ${widget.nomeCaixa}',
+                      'Caixa: ${widget.caixa.nome}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -93,7 +152,7 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Capacidade: ${widget.capacidadeTotal.toInt()} L',
+                      'Capacidade: ${widget.caixa.capacidadeTexto} L',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
@@ -145,7 +204,7 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
                       children: [
                         // Valor em Litros
                         Text(
-                          '${_litrosAtuais.toInt()}',
+                          _leitura == null ? '--' : formatarLitros(litros),
                           style: const TextStyle(
                             fontSize: 42,
                             fontWeight: FontWeight.w900,
@@ -165,7 +224,7 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
 
                         // Percentual
                         Text(
-                          '$percentualInt%',
+                          _leitura == null ? '--%' : '$percentualInt%',
                           style: const TextStyle(
                             fontSize: 38,
                             fontWeight: FontWeight.w900,
@@ -175,7 +234,7 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'de ${widget.capacidadeTotal.toInt()} Litros\nTotais',
+                          'de ${widget.caixa.capacidadeTexto} Litros\nTotais',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 14,
@@ -189,7 +248,17 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 16),
+              Text(
+                _textoAtualizacao(),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _semComunicacao ? Colors.orange.shade800 : Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 24),
 
               // Botão Histórico de Consumo
               SizedBox(
@@ -208,15 +277,48 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => HistoricoConsumoScreen(
-                          nomeCaixa: widget.nomeCaixa,
-                          capacidadeTotal: widget.capacidadeTotal,
-                        ),
+                        builder: (context) =>
+                            HistoricoConsumoScreen(caixa: widget.caixa),
                       ),
                     );
                   },
                   child: const Text(
                     'Histórico de Consumo',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Botão Histórico de Abastecimento
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D47A1),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => HistoricoConsumoScreen(
+                          caixa: widget.caixa,
+                          abastecimento: true,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'Histórico de Abastecimento',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -231,4 +333,4 @@ class _NivelAguaScreenState extends State<NivelAguaScreen> {
       ),
     );
   }
-}
+}

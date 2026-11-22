@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:nivel_certo/screens/tela_login.dart';
+import 'package:nivel_certo/screens/tela_minhascaixas.dart';
+import 'package:nivel_certo/services/auth_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: 'https://ngepvftlssgcqodxkgye.supabase.co',
+    publishableKey: 'sb_publishable_fuiNXjuLAfXOAjx6lESA3Q_xOtrn-Qp',
+  );
   runApp(const MyApp());
 }
 
@@ -27,8 +35,10 @@ class MyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      // Selecionand a tela de Login para iniciar o app
-      home: const LoginScreen(),
+      // Quem já está logado vai direto para Minhas Caixas; os demais, para o Login
+      home: AuthService.instance.logado
+          ? const MinhasCaixasScreen()
+          : const LoginScreen(),
     );
   }
 }
